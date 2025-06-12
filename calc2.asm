@@ -1,106 +1,96 @@
 .global _start
 
 .section .data
-msg:     .asciz "Result: "
-nl:      .asciz "\n"
-buf:     .space 12        ; ASCII number buffer
+msg:    .ascii "Result: "
+msglen = . - msg
+result: .ascii "     "      /* Buffer for result digits */
+newline: .ascii "\n"
 
 .section .text
 _start:
-    MOV     r0, #15        ; number 1
-    MOV     r1, #7         ; number 2
-    ADD     r2, r0, r1     ; r2 = r0 + r1
+    /* Simple addition: 15 + 7 = 22 */
+    mov r0, #15         /* First number */
+    mov r1, #7          /* Second number */
+    add r0, r0, r1      /* Result in r0 */
 
-    ; Prepare buffer address
-    LDR     r1, =buf
-    MOV     r0, r2         ; number to convert
-    BL      itoa           ; itoa(r0=r2, r1=buf)
+    /* Convert to ASCII - simple version for positive numbers 0-99 */
+    mov r1, #10         /* Divisor */
+    mov r2, #0          /* Digit counter */
 
-    ; Print "Result: "
-    MOV     r0, #1         ; stdout
-    LDR     r1, =msg
-    MOV     r2, #8
-    MOV     r7, #4         ; sys_write
-    SWI     0
+    /* First check if zero */
+    cmp r0, #0
+    bne div_loop
 
-    ; Print ASCII number
-    MOV     r0, #1
-    LDR     r1, =buf
-    MOV     r2, #12
-    MOV     r7, #4
-    SWI     0
+    /* Handle zero case */
+    mov r3, #48         /* ASCII '0' */
+    ldr r4, =result
+    strb r3, [r4]
+    mov r2, #1          /* Length = 1 */
+    b print_result
 
-    ; Print newline
-    MOV     r0, #1
-    LDR     r1, =nl
-    MOV     r2, #1
-    MOV     r7, #4
-    SWI     0
+div_loop:
+    /* Divide r0 by 10 */
+    mov r3, #0          /* Quotient */
+div_inner:
+    cmp r0, r1
+    blt div_done
+    sub r0, r0, r1
+    add r3, r3, #1
+    b div_inner
 
-    ; Exit
-    MOV     r0, #0
-    MOV     r7, #1
-    SWI     0
+div_done:
+    /* r0 now has remainder, r3 has quotient */
+    add r0, r0, #48     /* Convert remainder to ASCII */
+    
+    /* Store digit */
+    ldr r4, =result
+    add r4, r4, r2      /* Position in buffer */
+    strb r0, [r4]       /* Store digit */
+    add r2, r2, #1      /* Increment counter */
+    
+    /* Check if done */
+    cmp r3, #0
+    beq reverse
+    
+    /* Continue with quotient */
+    mov r0, r3
+    b div_loop
 
-; -------------- itoa function --------------
-; r0: number, r1: buffer address
-itoa:
-    STMFD   sp!, {r4-r7, lr}
-    MOV     r4, r1          ; buffer pointer
-    MOV     r5, #0          ; digit count
+reverse:
+    /* Reverse the digits (simple case for small numbers) */
+    cmp r2, #2
+    blt print_result    /* Nothing to reverse if only 1 digit */
+    
+    /* Swap first and last digit for 2-digit number */
+    ldr r4, =result
+    ldrb r0, [r4]
+    ldrb r1, [r4, #1]
+    strb r1, [r4]
+    strb r0, [r4, #1]
 
-    CMP     r0, #0
-    BNE     itoa_loop
-    MOV     r6, #'0'
-    STRB    r6, [r4], #1
-    MOV     r5, #1
-    B       itoa_done
+print_result:
+    /* Print "Result: " */
+    mov r7, #4          /* syscall: write */
+    mov r0, #1          /* stdout */
+    ldr r1, =msg
+    mov r2, #msglen
+    swi 0
 
-itoa_loop:
-    MOV     r6, r0
-    MOV     r7, #10
-    BL      udivmod         ; returns quotient in r0, remainder in r1
-    ADD     r1, r1, #'0'
-    STRB    r1, [r4], #1
-    ADD     r5, r5, #1
-    CMP     r0, #0
-    BNE     itoa_loop
+    /* Print result */
+    mov r7, #4          /* syscall: write */
+    mov r0, #1          /* stdout */
+    ldr r1, =result
+    /* r2 already has length */
+    swi 0
 
-itoa_done:
-    ; Reverse buffer
-    SUB     r4, r4, r5      ; r4 points to start
-    MOV     r6, r5
-    SUB     r6, r6, #1      ; r6 = r5-1
-    MOV     r7, #0
-itoa_rev_loop:
-    CMP     r7, r6
-    BGE     itoa_rev_end
-    LDRB    r2, [r4, r7]
-    LDRB    r3, [r4, r6]
-    STRB    r3, [r4, r7]
-    STRB    r2, [r4, r6]
-    ADD     r7, r7, #1
-    SUB     r6, r6, #1
-    B       itoa_rev_loop
-itoa_rev_end:
-    LDMFD   sp!, {r4-r7, lr}
-    BX      lr
+    /* Print newline */
+    mov r7, #4          /* syscall: write */
+    mov r0, #1          /* stdout */
+    ldr r1, =newline
+    mov r2, #1
+    swi 0
 
-; Unsigned division: r0 = dividend, r7 = divisor
-; Returns: r0 = quotient, r1 = remainder
-udivmod:
-    MOV     r2, #0          ; quotient
-    MOV     r3, r0          ; dividend
-    MOV     r4, r7          ; divisor
-    CMP     r4, #0
-    BEQ     udivmod_end
-udivmod_loop:
-    CMP     r3, r4
-    BLT     udivmod_end
-    SUB     r3, r3, r4
-    ADD     r2, r2, #1
-    B       udivmod_loop
-udivmod_end:
-    MOV     r0, r2          ; quotient
-    MOV     r1, r3          ; remainder
-    BX      lr
+    /* Exit */
+    mov r7, #1          /* syscall: exit */
+    mov r0, #0          /* status: 0 */
+    swi 0
