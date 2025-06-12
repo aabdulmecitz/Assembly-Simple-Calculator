@@ -9,7 +9,7 @@ section .bss
     num1 resb 10
     num2 resb 10
     op resb 2
-    sonuc resb 10
+    sonuc resb 12      ; buffer size increased for safety
 
 section .text
     global _start
@@ -98,8 +98,9 @@ bolme:
 
 yazdir:
     mov eax, esi
+    mov ecx, sonuc
     call itoa
-    mov edx, eax
+    mov edx, eax       ; eax = length
 
     mov eax, 4
     mov ebx, 1
@@ -110,7 +111,7 @@ yazdir:
     mov eax, 4
     mov ebx, 1
     mov ecx, sonuc
-    mov edx, edx
+    mov edx, eax       ; eax = length
     int 0x80
 
     mov eax, 4
@@ -145,21 +146,50 @@ atoi:
     ret
 
 ; Integer -> String
+; IN: eax = number, ecx = buffer
+; OUT: eax = length
 itoa:
-    mov ecx, 10
-    lea edi, [sonuc + 9]
-    mov byte [edi], 0
-    dec edi
+    mov ebx, 10
+    mov edi, ecx        ; edi = buffer
+    mov esi, edi
+    add esi, 11         ; write from end
+    mov byte [esi], 0
+    dec esi
+    mov edx, 0
+    mov ecx, 0          ; length
+
+    cmp eax, 0
+    jne .convert
+    mov byte [esi], '0'
+    dec esi
+    inc ecx
+    jmp .done
+
+.convert:
 .reverse:
     xor edx, edx
-    div ecx
+    div ebx
     add dl, '0'
-    mov [edi], dl
-    dec edi
+    mov [esi], dl
+    dec esi
+    inc ecx
     test eax, eax
     jnz .reverse
+
+.done:
+    inc esi             ; esi now points to first digit
+    mov edi, ecx        ; edi = length
+    mov ebx, ecx        ; ebx = length
+    mov edi, ecx        ; edi = length
+    ; Copy digits to buffer start
+    mov ecx, ebx        ; ecx = length
+    mov edi, sonuc      ; destination buffer
+    mov esi, esi        ; source pointer (already set)
+.rep:
+    mov al, [esi]
+    mov [edi], al
+    inc esi
     inc edi
-    sub edx, edx
-    mov eax, sonuc + 9
-    sub eax, edi
+    loop .rep
+    mov eax, ebx        ; return length
     ret
