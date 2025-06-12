@@ -1,25 +1,25 @@
 section .data
-    msg1 db "Sayi1: ", 0
-    msg2 db "Sayi2: ", 0
-    msg3 db "Islem (+ - * /): ", 0
-    resultMsg db "Sonuc: ", 0
+    msg1 db "Number1: ", 0
+    msg2 db "Number2: ", 0
+    msg3 db "Operation (+ - * /): ", 0
+    resultMsg db "Result: ", 0
     newline db 10
 
 section .bss
     num1 resb 10
     num2 resb 10
     op resb 2
-    sonuc resb 12      ; buffer size increased for safety
+    result resb 12      ; buffer size increased for safety
 
 section .text
     global _start
 
 _start:
-    ; Sayı 1
+    ; Number 1
     mov eax, 4
     mov ebx, 1
     mov ecx, msg1
-    mov edx, 7
+    mov edx, 9
     int 0x80
 
     mov eax, 3
@@ -28,11 +28,11 @@ _start:
     mov edx, 10
     int 0x80
 
-    ; Sayı 2
+    ; Number 2
     mov eax, 4
     mov ebx, 1
     mov ecx, msg2
-    mov edx, 7
+    mov edx, 9
     int 0x80
 
     mov eax, 3
@@ -41,11 +41,11 @@ _start:
     mov edx, 10
     int 0x80
 
-    ; İşlem seçimi
+    ; Operation selection
     mov eax, 4
     mov ebx, 1
     mov ecx, msg3
-    mov edx, 17
+    mov edx, 19
     int 0x80
 
     mov eax, 3
@@ -57,48 +57,48 @@ _start:
     ; String -> int
     mov ecx, num1
     call atoi
-    mov esi, eax        ; sayı1
+    mov esi, eax        ; number1
 
     mov ecx, num2
     call atoi
-    mov edi, eax        ; sayı2
+    mov edi, eax        ; number2
 
-    ; İşlem karakteri al
+    ; Get operation character
     mov al, [op]
     cmp al, '+'
-    je toplama
+    je addition
     cmp al, '-'
-    je cikarma
+    je subtraction
     cmp al, '*'
-    je carpma
+    je multiplication
     cmp al, '/'
-    je bolme
+    je division
 
-    jmp bitir
+    jmp finish
 
-toplama:
+addition:
     add esi, edi
-    jmp yazdir
+    jmp print
 
-cikarma:
+subtraction:
     sub esi, edi
-    jmp yazdir
+    jmp print
 
-carpma:
+multiplication:
     imul esi, edi
-    jmp yazdir
+    jmp print
 
-bolme:
+division:
     xor edx, edx
     mov eax, esi
     mov ebx, edi
     idiv ebx
     mov esi, eax
-    jmp yazdir
+    jmp print
 
-yazdir:
+print:
     mov eax, esi
-    mov ecx, sonuc
+    mov ecx, result
     call itoa
     mov edx, eax       ; eax = length
 
@@ -110,7 +110,7 @@ yazdir:
 
     mov eax, 4
     mov ebx, 1
-    mov ecx, sonuc
+    mov ecx, result
     mov edx, eax       ; eax = length
     int 0x80
 
@@ -120,13 +120,13 @@ yazdir:
     mov edx, 1
     int 0x80
 
-bitir:
+finish:
     mov eax, 1
     xor ebx, ebx
     int 0x80
 
 ; ------------------------
-; Yardımcı Fonksiyonlar
+; Helper Functions
 ; ------------------------
 
 ; String -> Integer
@@ -183,7 +183,7 @@ itoa:
     mov edi, ecx        ; edi = length
     ; Copy digits to buffer start
     mov ecx, ebx        ; ecx = length
-    mov edi, sonuc      ; destination buffer
+    mov edi, result     ; destination buffer
     mov esi, esi        ; source pointer (already set)
 .rep:
     mov al, [esi]
